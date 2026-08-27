@@ -1,0 +1,39 @@
+name: Atualizar tarifas ANEEL no Google Sheets
+
+on:
+  schedule:
+    # Roda todo dia às 08:00 no horário de Brasília (11:00 UTC — Brasil não
+    # tem mais horário de verão desde 2019, então esse offset é fixo).
+    - cron: "0 11 * * *"
+  workflow_dispatch: {}  # permite rodar manualmente pela aba "Actions" do GitHub
+
+jobs:
+  atualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalar dependências
+        run: pip install -r requirements.txt
+
+      - name: Dry run (preview, não escreve na planilha)
+        env:
+          GOOGLE_APPS_SCRIPT_URL: ${{ secrets.GOOGLE_APPS_SCRIPT_URL }}
+          GOOGLE_APPS_SCRIPT_TOKEN: ${{ secrets.GOOGLE_APPS_SCRIPT_TOKEN }}
+          GOOGLE_WORKSHEET: "TARIFAS_SUNCLICK"
+          DRY_RUN: "true"
+        run: python atualizar_google_sheets.py
+
+      - name: Atualizar planilha de verdade
+        env:
+          GOOGLE_APPS_SCRIPT_URL: ${{ secrets.GOOGLE_APPS_SCRIPT_URL }}
+          GOOGLE_APPS_SCRIPT_TOKEN: ${{ secrets.GOOGLE_APPS_SCRIPT_TOKEN }}
+          GOOGLE_WORKSHEET: "TARIFAS_SUNCLICK"
+          DRY_RUN: "false"
+        run: echo SIM | python atualizar_google_sheets.py
