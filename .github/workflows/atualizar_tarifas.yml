@@ -1,11 +1,14 @@
 name: Atualizar tarifas ANEEL no Google Sheets
 
 on:
-  schedule:
-    # Roda todo dia às 08:00 no horário de Brasília (11:00 UTC — Brasil não
-    # tem mais horário de verão desde 2019, então esse offset é fixo).
-    - cron: "0 11 * * *"
-  workflow_dispatch: {}  # permite rodar manualmente pela aba "Actions" do GitHub
+  # Sem agendamento automático de propósito: as tarifas homologadas não
+  # mudam todo dia, então a atualização é disparada sob demanda — pelo
+  # botão "⚡ SUNCLICK > 🔄 Atualizar Tarifas ANEEL" na própria planilha
+  # (que chama a API do GitHub por trás), ou manualmente por aqui na aba
+  # Actions. Se um dia fizer sentido voltar a ter um agendamento fixo, é só
+  # readicionar um bloco `schedule:` com um cron (ex.: "0 11 * * 1" pra
+  # toda segunda às 08h de Brasília).
+  workflow_dispatch: {}
 
 jobs:
   atualizar:
@@ -22,6 +25,12 @@ jobs:
       - name: Instalar dependências
         run: pip install -r requirements.txt
 
+      # Método de escrita: Web App do Apps Script vinculado à planilha (veja
+      # apps_script/LEIA-ME.md). Não usa credencial nenhuma do Google Cloud —
+      # só a URL do Web App e o token secreto definido no próprio Code.gs.
+      # Sempre roda em DRY_RUN primeiro: se algo estiver estranho no preview
+      # (pendências demais, ambiguidade nova), o job falha ANTES de escrever
+      # na planilha real.
       - name: Dry run (preview, não escreve na planilha)
         env:
           GOOGLE_APPS_SCRIPT_URL: ${{ secrets.GOOGLE_APPS_SCRIPT_URL }}
@@ -36,4 +45,7 @@ jobs:
           GOOGLE_APPS_SCRIPT_TOKEN: ${{ secrets.GOOGLE_APPS_SCRIPT_TOKEN }}
           GOOGLE_WORKSHEET: "TARIFAS_SUNCLICK"
           DRY_RUN: "false"
+        # A confirmação "SIM" do modo interativo é satisfeita via stdin —
+        # aqui não tem ninguém pra digitar, e como o job já passou pelo dry
+        # run acima sem erro, a confirmação automática é segura.
         run: echo SIM | python atualizar_google_sheets.py
