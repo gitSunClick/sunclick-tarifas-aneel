@@ -146,7 +146,17 @@ function doPost(e) {
       var campos = linha.campos || {};
       Object.keys(campos).forEach(function (nomeColuna) {
         var colIdx = cabecalho.indexOf(nomeColuna);
-        if (colIdx === -1) return; // coluna não existe na planilha, ignora
+        if (colIdx === -1) {
+          // coluna nova (ex.: TRCI, TC, Valor dos Tributos etc.) — cria no
+          // final da planilha em vez de ignorar, igual já fazíamos pra
+          // status/timestamp. Assim uma coluna nova adicionada no Python
+          // (config.COLUNAS_PLANILHA) aparece sozinha, sem precisar criar
+          // manualmente na planilha antes.
+          colIdx = cabecalho.length;
+          aba.getRange(1, colIdx + 1).setValue(nomeColuna);
+          cabecalho.push(nomeColuna);
+          ultimaColuna = cabecalho.length;
+        }
         aba.getRange(linhaPlanilha, colIdx + 1).setValue(campos[nomeColuna]);
       });
 
