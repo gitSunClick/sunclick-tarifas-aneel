@@ -302,6 +302,11 @@ COLUNAS_PLANILHA = {
     "trci": "TRCI",
     "tc": "TC",
     "tusd_g_imposto": "TUSD G Com Impostos",
+    # Pedido da Nathalia (11/09/2026): TE e TUSD com impostos (etapas
+    # intermediárias do cálculo do TRCI) também visíveis como colunas —
+    # antes eram calculadas só internamente, sem virar coluna na planilha.
+    "te_com_imposto": "TE Com Impostos",
+    "tusd_com_imposto": "TUSD Com Impostos",
     # Saídas adicionais da especificação (seção 2) — a pedido da Nathalia
     # em 10/09/2026, além de TRCI/TC.
     "valor_tributos": "Valor dos Tributos (R$/MWh)",
