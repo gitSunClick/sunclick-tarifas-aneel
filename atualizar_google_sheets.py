@@ -137,6 +137,8 @@ def _calcular_trci_tc(dist, valores, notas) -> None:
     valores["tusd_g_imposto"] = None
     valores["valor_tributos"] = None
     valores["carga_efetiva"] = None
+    valores["te_com_imposto"] = None
+    valores["tusd_com_imposto"] = None
 
     uf = dist.get("uf")
     tabela_uf = config.TABELA_UF_TRIBUTOS.get(uf)
@@ -182,6 +184,8 @@ def _calcular_trci_tc(dist, valores, notas) -> None:
     valores["tusd_g_imposto"] = resultado.tusd_g_com_imposto
     valores["valor_tributos"] = resultado.valor_tributos
     valores["carga_efetiva"] = resultado.carga_efetiva
+    valores["te_com_imposto"] = resultado.te_com_imposto
+    valores["tusd_com_imposto"] = resultado.tusd_com_imposto
 
 
 _PADRAO_RESOLUCAO = re.compile(r"N[ºO°]?\.?\s*([\d.]+).*?(\d{4})", re.IGNORECASE)
