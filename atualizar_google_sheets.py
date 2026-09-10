@@ -188,14 +188,13 @@ _PADRAO_RESOLUCAO = re.compile(r"N[ºO°]?\.?\s*([\d.]+).*?(\d{4})", re.IGNORECA
 
 
 def _formatar_resolucao(texto: str) -> str:
-    """Pedido da Nathalia (10/09/2026): além do texto completo da resolução
-    (ex.: 'RESOLUÇÃO HOMOLOGATÓRIA Nº 3.588, DE 19 DE MAIO DE 2026'),
-    adicionar no final o número e o ano no formato curto 'NNNN/AAAA' (ex.:
-    '3588/2026'), pra ficar mais fácil de escanear/filtrar na planilha.
-    Resultado final: texto original + ' - 3588/2026'. Se o texto não bater
-    com o padrão esperado (raro, formato inesperado vindo da ANEEL), devolve
-    o texto original sem alteração — nunca quebra a extração por causa
-    disso."""
+    """Pedido da Nathalia (10/09/2026): na planilha, o campo de resolução
+    deve mostrar só o número e o ano no formato curto 'NNNN/AAAA' (ex.:
+    '3588/2026'), em vez do texto completo que vem da ANEEL (ex.:
+    'RESOLUÇÃO HOMOLOGATÓRIA Nº 3.588, DE 19 DE MAIO DE 2026'). Se o texto
+    não bater com o padrão esperado (raro, formato inesperado vindo da
+    ANEEL), devolve o texto original sem alteração — nunca quebra a
+    extração por causa disso."""
     if not texto:
         return texto
     m = _PADRAO_RESOLUCAO.search(texto)
@@ -203,7 +202,7 @@ def _formatar_resolucao(texto: str) -> str:
         return texto
     numero = m.group(1).replace(".", "")
     ano = m.group(2)
-    return f"{texto} - {numero}/{ano}"
+    return f"{numero}/{ano}"
 
 
 def extrair_distribuidora(dist, df_tarifas, df_componentes, hoje):
