@@ -200,6 +200,68 @@ CONTROLE_VALIDACAO = {
 
 
 # ---------------------------------------------------------------------------
+# TRCI / TC — tabela de tributos por UF (seção 8 da especificação recebida
+# da Nathalia em 10/09/2026, "ESPECIFICAÇÃO DE CÁLCULO DE TARIFA —
+# IMPLANTAÇÃO"). Isso é FALLBACK/DEFAULT — nunca fonte primária. A regra de
+# precedência é: COALESCE(override_distribuidora, default_uf), implementada
+# em calculos_tarifa.resolver_flag_compensacao() e usada em
+# atualizar_google_sheets.py.
+#
+# Campos por UF:
+#   icms                        alíquota de ICMS sobre energia (TE e TUSD)
+#   pis / cofins / pis_cofins   alíquotas de PIS, COFINS e a soma dos dois
+#   isencao_1mw / isencao_5mw   flags informativas da especificação (não
+#                                usadas no cálculo de TRCI/TC em si — ficam
+#                                aqui só como referência/auditoria)
+#   compensa_icms_te_default    default estadual: compensa ICMS na TE?
+#   compensa_icms_tusd_default  default estadual: compensa ICMS na TUSD?
+#   plano_compensacao           texto livre, só documentação
+# ---------------------------------------------------------------------------
+TABELA_UF_TRIBUTOS = {
+    "AC": {"icms": 0.221, "pis": 0.01, "cofins": 0.04, "pis_cofins": 0.05, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "AL": {"icms": 0.212, "pis": 0.01, "cofins": 0.04, "pis_cofins": 0.05, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "AM": {"icms": 0.16, "pis": 0.01, "cofins": 0.045, "pis_cofins": 0.055, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "AP": {"icms": 0.16, "pis": 0.01, "cofins": 0.045, "pis_cofins": 0.055, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "BA": {"icms": 0.205, "pis": 0.01, "cofins": 0.045, "pis_cofins": 0.055, "isencao_1mw": True, "isencao_5mw": True, "compensa_icms_te_default": True, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 5MW TE"},
+    "CE": {"icms": 0.2, "pis": 0.01, "cofins": 0.04, "pis_cofins": 0.05, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": True, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "DF": {"icms": 0.18, "pis": 0.01, "cofins": 0.05, "pis_cofins": 0.06, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "ES": {"icms": 0.18, "pis": 0.01, "cofins": 0.04, "pis_cofins": 0.05, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "GO": {"icms": 0.19, "pis": 0.01, "cofins": 0.045, "pis_cofins": 0.055, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "MA": {"icms": 0.17, "pis": 0.01, "cofins": 0.045, "pis_cofins": 0.055, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "MG": {"icms": 0.21, "pis": 0.01, "cofins": 0.045, "pis_cofins": 0.055, "isencao_1mw": True, "isencao_5mw": True, "compensa_icms_te_default": True, "compensa_icms_tusd_default": True, "plano_compensacao": "Isencao 5MW TE|TUSD"},
+    "MS": {"icms": 0.18, "pis": 0.01, "cofins": 0.045, "pis_cofins": 0.055, "isencao_1mw": True, "isencao_5mw": True, "compensa_icms_te_default": True, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 5MW TE"},
+    "MT": {"icms": 0.17, "pis": 0.01, "cofins": 0.04, "pis_cofins": 0.05, "isencao_1mw": True, "isencao_5mw": True, "compensa_icms_te_default": True, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 5MW TE"},
+    "PA": {"icms": 0.19, "pis": 0.01, "cofins": 0.04, "pis_cofins": 0.05, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "PB": {"icms": 0.25, "pis": 0.01, "cofins": 0.045, "pis_cofins": 0.055, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "PE": {"icms": 0.255, "pis": 0.01, "cofins": 0.04, "pis_cofins": 0.05, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "PI": {"icms": 0.255, "pis": 0.01, "cofins": 0.04, "pis_cofins": 0.05, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "PR": {"icms": 0.18, "pis": 0.01, "cofins": 0.04, "pis_cofins": 0.05, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "RJ": {"icms": 0.24, "pis": 0.01, "cofins": 0.045, "pis_cofins": 0.055, "isencao_1mw": True, "isencao_5mw": True, "compensa_icms_te_default": True, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 5MW TE"},
+    "RN": {"icms": 0.18, "pis": 0.01, "cofins": 0.045, "pis_cofins": 0.055, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "RO": {"icms": 0.185, "pis": 0.01, "cofins": 0.045, "pis_cofins": 0.055, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "RR": {"icms": 0.157, "pis": 0.01, "cofins": 0.045, "pis_cofins": 0.055, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "RS": {"icms": 0.18, "pis": 0.009, "cofins": 0.0413, "pis_cofins": 0.0503, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "SC": {"icms": 0.18, "pis": 0.01, "cofins": 0.045, "pis_cofins": 0.055, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "SE": {"icms": 0.18, "pis": 0.01, "cofins": 0.045, "pis_cofins": 0.055, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+    "SP": {"icms": 0.18, "pis": 0.01, "cofins": 0.045, "pis_cofins": 0.055, "isencao_1mw": True, "isencao_5mw": True, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 5MW TE"},
+    "TO": {"icms": 0.18, "pis": 0.01, "cofins": 0.04, "pis_cofins": 0.05, "isencao_1mw": True, "isencao_5mw": False, "compensa_icms_te_default": False, "compensa_icms_tusd_default": False, "plano_compensacao": "Isencao 1MW"},
+}
+
+# Overrides POR DISTRIBUIDORA (condição negociada, diferente do padrão do
+# estado) — chave = "nome_interno" de config.DISTRIBUIDORAS. Fica VAZIO por
+# padrão (nenhuma distribuidora tem override cadastrado ainda): todas usam o
+# default da UF até a Nathalia/o time de negócio confirmar uma condição
+# específica diferente. Preencha assim quando descobrir uma:
+#   OVERRIDES_COMPENSACAO_ICMS = {
+#       "Nome Interno Exato": {"te": True, "tusd": False},
+#   }
+# Cada valor é True/False (condição negociada) — nunca None aqui (None só
+# existe como "ausência de override", ou seja, simplesmente não colocar a
+# distribuidora neste dict).
+OVERRIDES_COMPENSACAO_ICMS = {}
+
+
+# ---------------------------------------------------------------------------
 # Google Sheets
 # ---------------------------------------------------------------------------
 
@@ -232,4 +294,16 @@ COLUNAS_PLANILHA = {
     # pra todas as linhas antes de regravar, pra nunca sobrar um valor
     # antigo enganoso.
     "timestamp": "Última Atualização",
+    # TRCI/TC (10/09/2026) — calculadas por calculos_tarifa.py a partir de
+    # TE/TUSD sem imposto + TABELA_UF_TRIBUTOS + OVERRIDES_COMPENSACAO_ICMS.
+    # Nomes de coluna são um ponto de partida — ajuste aqui se a Nathalia
+    # quiser um cabeçalho diferente na planilha (o script cria a coluna
+    # automaticamente com este nome se ela não existir ainda).
+    "trci": "TRCI",
+    "tc": "TC",
+    "tusd_g_imposto": "TUSD G Com Impostos",
+    # Saídas adicionais da especificação (seção 2) — a pedido da Nathalia
+    # em 10/09/2026, além de TRCI/TC.
+    "valor_tributos": "Valor dos Tributos (R$/MWh)",
+    "carga_efetiva": "Carga Tributária Efetiva (%)",
 }
