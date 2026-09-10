@@ -84,6 +84,11 @@ from aneel_lib import (
     carregar_componentes_tarifarios,
     carregar_tarifas_homologadas,
 )
+from calculos_tarifa import (
+    AliquotaInvalidaError,
+    calcular_tarifa_distribuidora,
+    resolver_flag_compensacao,
+)
 
 DRY_RUN = os.environ.get("DRY_RUN", "true").strip().lower() != "false"
 GOOGLE_SERVICE_ACCOUNT_FILE = os.environ.get(
@@ -109,6 +114,73 @@ def _agora_texto() -> str:
     timestamp dentro do próprio Code.gs, no fuso da planilha."""
     agora = datetime.now(_FUSO_BRASILIA) if _FUSO_BRASILIA else datetime.now()
     return agora.strftime("%d/%m/%Y %H:%M")
+
+
+def _calcular_trci_tc(dist, valores, notas) -> None:
+    """Calcula TRCI (tarifa cheia com imposto), TC (tarifa compensada) e
+    TUSD G com imposto, e grava em `valores` (in-place). Nunca lança
+    exceção — qualquer problema (UF não cadastrada, alíquota inválida)
+    vira uma nota em `notas` (também in-place) e os 3 campos ficam None,
+    igual ao padrão já usado pro resto da função: uma distribuidora com
+    problema aqui não pode travar as outras 32.
+
+    Regra de precedência (especificação seção 1, linha 20): as flags de
+    compensação de ICMS são POR DISTRIBUIDORA (config.OVERRIDES_COMPENSACAO_ICMS)
+    — fonte primária — com fallback pro default da UF
+    (config.TABELA_UF_TRIBUTOS). As alíquotas (ICMS, PIS/COFINS) sempre vêm
+    da tabela por UF — a especificação não permite override de alíquota por
+    distribuidora, só das flags de compensação.
+    """
+    valores["trci"] = None
+    valores["tc"] = None
+    valores["tusd_g_imposto"] = None
+    valores["valor_tributos"] = None
+    valores["carga_efetiva"] = None
+
+    uf = dist.get("uf")
+    tabela_uf = config.TABELA_UF_TRIBUTOS.get(uf)
+    if not tabela_uf:
+        notas.append(f"TRCI/TC: UF '{uf}' não cadastrada em config.TABELA_UF_TRIBUTOS.")
+        return
+
+    te_sem_imposto = valores.get("te")
+    tusd_sem_imposto = valores.get("tusd")
+    if te_sem_imposto is None or tusd_sem_imposto is None:
+        notas.append("TRCI/TC: sem TE/TUSD sem imposto pra calcular a partir.")
+        return
+
+    overrides = config.OVERRIDES_COMPENSACAO_ICMS.get(dist["nome_interno"], {})
+    flag_comp_icms_te = resolver_flag_compensacao(
+        overrides.get("te"), tabela_uf["compensa_icms_te_default"]
+    )
+    flag_comp_icms_tusd = resolver_flag_compensacao(
+        overrides.get("tusd"), tabela_uf["compensa_icms_tusd_default"]
+    )
+
+    try:
+        resultado = calcular_tarifa_distribuidora(
+            te_sem_imposto=te_sem_imposto,
+            tusd_sem_imposto=tusd_sem_imposto,
+            aliq_pis_cofins=tabela_uf["pis_cofins"],
+            # A especificação (seção 1) usa aliq_icms_te/aliq_icms_tusd
+            # separadas, mas ambas vêm "← seção 8 por UF" — ou seja, a
+            # mesma alíquota de ICMS da UF pros dois lados; não há uma
+            # coluna de ICMS separada pra TE vs. TUSD na seção 8.
+            aliq_icms_te=tabela_uf["icms"],
+            aliq_icms_tusd=tabela_uf["icms"],
+            flag_comp_icms_te=flag_comp_icms_te,
+            flag_comp_icms_tusd=flag_comp_icms_tusd,
+            tusd_g_sem_imposto=valores.get("tusd_g"),
+        )
+    except AliquotaInvalidaError as exc:
+        notas.append(f"TRCI/TC: {exc}")
+        return
+
+    valores["trci"] = resultado.tarifa_cheia
+    valores["tc"] = resultado.tarifa_compensada
+    valores["tusd_g_imposto"] = resultado.tusd_g_com_imposto
+    valores["valor_tributos"] = resultado.valor_tributos
+    valores["carga_efetiva"] = resultado.carga_efetiva
 
 
 def extrair_distribuidora(dist, df_tarifas, df_componentes, hoje):
@@ -168,6 +240,8 @@ def extrair_distribuidora(dist, df_tarifas, df_componentes, hoje):
 
     if status_componentes:
         notas.append("; ".join(status_componentes))
+
+    _calcular_trci_tc(dist, valores, notas)
 
     observacao = " | ".join(notas)
     return {
