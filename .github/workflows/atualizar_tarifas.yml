@@ -45,6 +45,13 @@ jobs:
           GOOGLE_APPS_SCRIPT_TOKEN: ${{ secrets.GOOGLE_APPS_SCRIPT_TOKEN }}
           GOOGLE_WORKSHEET: "TARIFAS_SUNCLICK"
           DRY_RUN: "true"
+          # Sem isso, o Python faz buffering da saída (print) quando não está
+          # rodando num terminal de verdade — o log do GitHub Actions fica
+          # "mudo" enquanto o download dos CSVs da ANEEL (350+ MB) roda, e só
+          # mostra tudo de uma vez no final. Com PYTHONUNBUFFERED=1, cada
+          # print aparece em tempo real no log, então dá pra ver exatamente
+          # em qual download/etapa o job está parado, se demorar.
+          PYTHONUNBUFFERED: "1"
         run: python atualizar_google_sheets.py
 
       - name: Atualizar planilha de verdade
@@ -53,6 +60,7 @@ jobs:
           GOOGLE_APPS_SCRIPT_TOKEN: ${{ secrets.GOOGLE_APPS_SCRIPT_TOKEN }}
           GOOGLE_WORKSHEET: "TARIFAS_SUNCLICK"
           DRY_RUN: "false"
+          PYTHONUNBUFFERED: "1"
         # A confirmação "SIM" do modo interativo é satisfeita via stdin —
         # aqui não tem ninguém pra digitar, e como o job já passou pelo dry
         # run acima sem erro, a confirmação automática é segura.
