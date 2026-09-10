@@ -131,5 +131,37 @@ rc2 = buscar_componente(dfc, "CEEE-D", config.COMPONENTES_DESEJADOS["fio_b"], ho
 assert rc2.status == "OK" and abs(rc2.linhas.iloc[0]["VlrComponenteTarifario_num"] - 120.50) < 0.001
 print("OK  caso 6: busca de Fio B (rótulo real 'TUSD_FioB', sem espaço) no formato longo")
 
+# --- caso 7: duas resoluções vigentes ao mesmo tempo, com datas de início
+# DIFERENTES -> resolve sozinho escolhendo a mais recente, sem virar AMBIGUO
+# (situação real: a ANEEL publica a resolução nova antes de fechar o
+# DatFimVigencia da antiga).
+linhas_duas_vigencias = [
+    dict(SigAgente="CEEE-D", DscBaseTarifaria="Tarifa de Aplicação", DscSubGrupo="B1",
+         DscModalidadeTarifaria="Convencional", DscClasse="Residencial",
+         DscSubClasse="Residencial", DscDetalhe="Não se aplica",
+         DatInicioVigencia="2025-11-01", DatFimVigencia="2026-11-21",
+         DscREH="Resolução antiga (ainda não encerrada)",
+         VlrTUSD="400,00", VlrTE="300,00"),
+    dict(SigAgente="CEEE-D", DscBaseTarifaria="Tarifa de Aplicação", DscSubGrupo="B1",
+         DscModalidadeTarifaria="Convencional", DscClasse="Residencial",
+         DscSubClasse="Residencial", DscDetalhe="Não se aplica",
+         DatInicioVigencia="2026-05-01", DatFimVigencia="2026-11-21",
+         DscREH="Resolução nova (a que deve ser escolhida)",
+         VlrTUSD="500,00", VlrTE="350,00"),
+]
+df7 = preparar(linhas_duas_vigencias)
+r7 = buscar_vigente(df7, "CEEE-D", config.FILTRO_TUSD_TE, hoje=hoje)
+assert r7.status == "OK", f"esperado OK (resolve pela mais recente), veio {r7.status}: {r7.observacao}"
+assert abs(r7.linhas.iloc[0]["VlrTUSD_num"] - 500.00) < 0.001, r7.linhas.iloc[0]["VlrTUSD_num"]
+assert r7.observacao, "esperava uma observação explicando a escolha automática"
+assert "2026-05-01" in r7.observacao, r7.observacao
+print("OK  caso 7: duas vigências simultâneas com datas de início diferentes -> escolhe a mais recente, com observação")
+
+# --- caso 8: duas vigências simultâneas com a MESMA data de início -> ainda
+# é AMBIGUO de verdade (não dá pra desempatar por data).
+r8 = buscar_vigente(df3, "CEEE-D", config.FILTRO_TUSD_TE, hoje=hoje)  # df3 é o caso 3, mesma data
+assert r8.status == "AMBIGUO", r8.status
+print("OK  caso 8: duas vigências com a MESMA data de início -> continua AMBIGUO (ambiguidade genuína)")
+
 print("\nTodos os testes de lógica passaram (com dados sintéticos).")
 print("Isso confirma a correção do bug de parsing de data encontrado em produção.")
