@@ -160,7 +160,7 @@ DISTRIBUIDORAS = [
     {"nome_interno": "Cemar", "uf": "MA", "sig_agente": "EQUATORIAL MA"},  # confirmado pela aba SOP da planilha
     {"nome_interno": "Cemig-D", "uf": "MG", "sig_agente": "CEMIG-D"},
     {"nome_interno": "Cepisa", "uf": "PI", "sig_agente": "EQUATORIAL PI"},  # Equatorial comprou a Cepisa
-    {"nome_interno": "Energisa Rondônia", "uf": "RO", "sig_agente": "ERO"},  # era "Ceron" — renomeada na planilha em 09/2026 (Energisa comprou/renomeou a Ceron); sig_agente ERO confirmado 27/08/2026 continua valendo, a ANEEL não mudou o nome na base dela
+    {"nome_interno": "Energisa Rondonia", "uf": "RO", "sig_agente": "ERO"},  # era "Ceron" — renomeada na planilha em 09/2026 (Energisa comprou/renomeou a Ceron); grafia SEM acento confirmada contra a célula real da planilha em 10/09/2026 (o nome_interno precisa bater exatamente com a coluna "Distribuidora"); sig_agente ERO confirmado 27/08/2026 continua valendo, a ANEEL não mudou o nome na base dela
     {"nome_interno": "Coelba", "uf": "BA", "sig_agente": "COELBA"},
     {"nome_interno": "Copel-DIS", "uf": "PR", "sig_agente": "COPEL-DIS"},
     {"nome_interno": "Cosern", "uf": "RN", "sig_agente": "COSERN"},
@@ -226,4 +226,10 @@ COLUNAS_PLANILHA = {
     # Coluna extra criada pelo script para registrar OK / pendências —
     # se não existir na planilha, o script cria automaticamente.
     "status": "Status atualização",
+    # Coluna extra com a data/hora da última tentativa de atualização
+    # (mesmo quando dá pendência) — também criada automaticamente se não
+    # existir. A cada execução, o Code.gs limpa essa coluna (e a de status)
+    # pra todas as linhas antes de regravar, pra nunca sobrar um valor
+    # antigo enganoso.
+    "timestamp": "Última Atualização",
 }
