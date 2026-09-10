@@ -227,6 +227,40 @@ class ResultadoBusca:
     observacao: str = ""
 
 
+def _resolver_por_resolucao_mais_recente(vigentes: pd.DataFrame):
+    """Quando mais de um registro está vigente ao mesmo tempo, isso quase
+    sempre é a ANEEL publicando uma resolução homologatória nova sem ter
+    encerrado (DatFimVigencia) a resolução anterior a tempo — as duas ficam
+    "vigentes" simultaneamente por um tempo. Nesse caso, usamos a de
+    DatInicioVigencia mais recente (a resolução mais atual), em vez de
+    desistir com AMBIGUO.
+
+    Só continua sendo AMBIGUO de verdade se, mesmo depois de olhar a data
+    de início mais recente, ainda sobrar mais de um registro com essa
+    MESMA data (aí sim não dá pra escolher sozinho — normalmente sinal de
+    um problema real nos dados, não de resolução antiga/nova convivendo).
+
+    Devolve (linhas_escolhidas, observacao_ou_None). observacao vem
+    preenchida só quando a escolha por data mais recente foi de fato
+    usada para desempatar (mais de um registro vigente originalmente).
+    """
+    if len(vigentes) <= 1:
+        return vigentes, None
+
+    data_mais_recente = vigentes["DatInicioVigencia_dt"].max()
+    mais_recentes = vigentes[vigentes["DatInicioVigencia_dt"] == data_mais_recente]
+
+    if len(mais_recentes) > 1:
+        return mais_recentes, None  # ambiguidade genuína, sem observação de "resolvido"
+
+    inicio_txt = mais_recentes.iloc[0].get("DatInicioVigencia", "")
+    observacao = (
+        f"{len(vigentes)} registros vigentes simultaneamente (resolução antiga ainda não "
+        f"encerrada) — usada a mais recente, com início de vigência em {inicio_txt}."
+    )
+    return mais_recentes, observacao
+
+
 def buscar_vigente(
     df: pd.DataFrame,
     sig_agente: Optional[str],
@@ -273,14 +307,16 @@ def buscar_vigente(
             obs += f" ({len(candidatos)} registro(s) do agente/filtro encontrados, mas fora da vigência.)"
         return ResultadoBusca("SEM_TARIFA_VIGENTE", linhas=candidatos, observacao=obs)
 
+    vigentes, obs_resolucao = _resolver_por_resolucao_mais_recente(vigentes)
+
     if len(vigentes) > 1:
         return ResultadoBusca(
             "AMBIGUO",
             linhas=vigentes,
-            observacao=f"{len(vigentes)} registros vigentes simultaneamente — não dá pra escolher sozinho.",
+            observacao=f"{len(vigentes)} registros vigentes simultaneamente (mesma data de início de vigência) — não dá pra escolher sozinho.",
         )
 
-    return ResultadoBusca("OK", linhas=vigentes)
+    return ResultadoBusca("OK", linhas=vigentes, observacao=obs_resolucao or "")
 
 
 def buscar_componente(
@@ -328,9 +364,12 @@ def buscar_componente(
 
     if vigentes.empty:
         return ResultadoBusca("SEM_TARIFA_VIGENTE", linhas=candidatos, observacao="Nenhum componente vigente encontrado.")
+
+    vigentes, obs_resolucao = _resolver_por_resolucao_mais_recente(vigentes)
+
     if len(vigentes) > 1:
         return ResultadoBusca(
             "AMBIGUO", linhas=vigentes,
-            observacao=f"{len(vigentes)} componentes vigentes simultaneamente para os rótulos {rotulos_possiveis}.",
+            observacao=f"{len(vigentes)} componentes vigentes simultaneamente (mesma data de início de vigência) para os rótulos {rotulos_possiveis}.",
         )
-    return ResultadoBusca("OK", linhas=vigentes)
+    return ResultadoBusca("OK", linhas=vigentes, observacao=obs_resolucao or "")
