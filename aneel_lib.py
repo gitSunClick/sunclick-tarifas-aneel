@@ -60,20 +60,46 @@ def _baixar_com_cache(url: str, nome_arquivo: str) -> str:
             print(f"[cache] usando {caminho} (baixado há {idade_horas:.1f}h)")
             return caminho
 
-    # Arquivo grande (dezenas de MB) — em rede corporativa (VPN, antivírus
-    # ou proxy que inspeciona HTTPS) não é raro a conexão cair no meio do
-    # download. Tenta algumas vezes com espera crescente antes de desistir.
-    tentativas = 4
+    # Arquivo grande (dezenas/centenas de MB) — em rede corporativa (VPN,
+    # antivírus ou proxy que inspeciona HTTPS) ou quando o servidor da ANEEL
+    # está instável (visto acontecer em 10/09/2026, mais de uma vez no mesmo
+    # dia), não é raro a conexão cair no meio do download.
+    #
+    # Em vez de reiniciar do ZERO a cada tentativa (o que, num arquivo de
+    # ~265MB que cai reincidentemente perto dos ~100MB, fazia as 4 tentativas
+    # se esgotarem sem NUNCA passar do ponto onde sempre caía), cada nova
+    # tentativa RETOMA de onde parou usando Range request HTTP — só baixa o
+    # que falta, então cada tentativa subsequente tem uma fatia menor pra
+    # completar e uma chance bem maior de terminar antes de cair de novo. Se
+    # o servidor não suportar Range (responde 200 em vez de 206), cai de
+    # volta pra baixar do zero — mesmo comportamento de antes, só que ainda
+    # com mais tentativas e espera maior.
+    tentativas = 6
     espera = 3
     ultimo_erro = None
+    tmp = caminho + ".tmp"
     for tentativa in range(1, tentativas + 1):
+        offset = os.path.getsize(tmp) if os.path.exists(tmp) else 0
+        headers = dict(HEADERS)
+        modo_arquivo = "wb"
+        se_retomando = ""
+        if offset > 0:
+            headers["Range"] = f"bytes={offset}-"
+            modo_arquivo = "ab"
+            se_retomando = f", retomando de {offset / 1_000_000:.1f} MB já baixados"
         try:
-            print(f"Baixando {url} ... (tentativa {tentativa}/{tentativas})")
-            with requests.get(url, headers=HEADERS, stream=True, timeout=180) as resp:
+            print(f"Baixando {url} ... (tentativa {tentativa}/{tentativas}{se_retomando})")
+            with requests.get(url, headers=headers, stream=True, timeout=180) as resp:
+                if offset > 0 and resp.status_code == 200:
+                    # Servidor ignorou o Range e mandou o arquivo inteiro de
+                    # novo — não dá pra continuar um .tmp parcial nesse caso,
+                    # descarta e recomeça do zero nesta mesma tentativa.
+                    print("  servidor não suportou retomada (Range) — baixando do zero")
+                    offset = 0
+                    modo_arquivo = "wb"
                 resp.raise_for_status()
-                tmp = caminho + ".tmp"
-                total = 0
-                with open(tmp, "wb") as f:
+                total = offset
+                with open(tmp, modo_arquivo) as f:
                     for chunk in resp.iter_content(chunk_size=1024 * 1024):
                         f.write(chunk)
                         total += len(chunk)
@@ -83,14 +109,20 @@ def _baixar_com_cache(url: str, nome_arquivo: str) -> str:
         except requests.exceptions.RequestException as exc:
             ultimo_erro = exc
             if tentativa < tentativas:
-                print(f"  falhou ({exc.__class__.__name__}: {exc}) — tentando de novo em {espera}s...")
+                tamanho_parcial = os.path.getsize(tmp) if os.path.exists(tmp) else 0
+                print(
+                    f"  falhou ({exc.__class__.__name__}: {exc}) — "
+                    f"{tamanho_parcial / 1_000_000:.1f} MB já salvos, tentando retomar em {espera}s..."
+                )
                 time.sleep(espera)
                 espera *= 2
     raise RuntimeError(
-        f"Não consegui baixar {url} depois de {tentativas} tentativas. "
-        f"Último erro: {ultimo_erro}. Se estiver numa rede corporativa "
-        f"(VPN/antivírus/proxy que inspeciona HTTPS), tente numa rede "
-        f"diferente, ou rode de novo mais tarde."
+        f"Não consegui baixar {url} depois de {tentativas} tentativas (com retomada "
+        f"automática de onde parou). Último erro: {ultimo_erro}. Se estiver numa rede "
+        f"corporativa (VPN/antivírus/proxy que inspeciona HTTPS), tente numa rede "
+        f"diferente; se o problema for do lado do servidor da ANEEL (comum em picos de "
+        f"instabilidade), rode de novo mais tarde — o download retoma de onde parou na "
+        f"próxima execução deste processo."
     )
 
 
