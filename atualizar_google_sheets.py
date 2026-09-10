@@ -68,6 +68,7 @@ Uso:
 """
 
 import os
+import re
 import sys
 from datetime import date, datetime
 
@@ -183,6 +184,28 @@ def _calcular_trci_tc(dist, valores, notas) -> None:
     valores["carga_efetiva"] = resultado.carga_efetiva
 
 
+_PADRAO_RESOLUCAO = re.compile(r"N[ºO°]?\.?\s*([\d.]+).*?(\d{4})", re.IGNORECASE)
+
+
+def _formatar_resolucao(texto: str) -> str:
+    """Pedido da Nathalia (10/09/2026): além do texto completo da resolução
+    (ex.: 'RESOLUÇÃO HOMOLOGATÓRIA Nº 3.588, DE 19 DE MAIO DE 2026'),
+    adicionar no final o número e o ano no formato curto 'NNNN/AAAA' (ex.:
+    '3588/2026'), pra ficar mais fácil de escanear/filtrar na planilha.
+    Resultado final: texto original + ' - 3588/2026'. Se o texto não bater
+    com o padrão esperado (raro, formato inesperado vindo da ANEEL), devolve
+    o texto original sem alteração — nunca quebra a extração por causa
+    disso."""
+    if not texto:
+        return texto
+    m = _PADRAO_RESOLUCAO.search(texto)
+    if not m:
+        return texto
+    numero = m.group(1).replace(".", "")
+    ano = m.group(2)
+    return f"{texto} - {numero}/{ano}"
+
+
 def extrair_distribuidora(dist, df_tarifas, df_componentes, hoje):
     """Devolve um dict {campo_interno: valor} + status/observação para uma
     distribuidora. Nunca lança exceção — problemas viram status/observação
@@ -203,7 +226,7 @@ def extrair_distribuidora(dist, df_tarifas, df_componentes, hoje):
     valores = {
         "tusd": linha["VlrTUSD_num"],
         "te": linha["VlrTE_num"],
-        "resolucao": linha.get("DscREH", ""),
+        "resolucao": _formatar_resolucao(linha.get("DscREH", "")),
         "inicio_vigencia": linha.get("DatInicioVigencia", ""),
     }
 
