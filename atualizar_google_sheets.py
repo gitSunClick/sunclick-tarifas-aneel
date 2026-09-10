@@ -70,6 +70,7 @@ Uso:
 import os
 import re
 import sys
+import time
 from datetime import date, datetime
 
 try:
@@ -392,12 +393,43 @@ def escrever_via_apps_script(resultados):
         "linhas": _montar_linhas_apps_script(resultados),
     }
 
-    resp = requests.post(GOOGLE_APPS_SCRIPT_URL, json=payload, timeout=120)
-    try:
-        dados = resp.json()
-    except ValueError:
-        print(f"ERRO: resposta inesperada do Apps Script (status {resp.status_code}):\n{resp.text[:2000]}")
-        sys.exit(1)
+    # O Apps Script Web App, de vez em quando, executa o doPost() com
+    # sucesso (a planilha É atualizada de verdade) mas a resposta HTTP que
+    # volta é uma página de erro do próprio Google em vez do JSON esperado
+    # — um problema transitório de infraestrutura do lado do Google
+    # (confirmado em produção em 11/09/2026: a planilha atualizou
+    # corretamente mesmo com esse erro aparecendo no log). Como a escrita é
+    # idempotente (sempre limpa e regrava tudo do zero a cada chamada),
+    # tentar de novo é seguro — não duplica nem corrompe nada. Só desiste
+    # de vez depois de esgotar as tentativas.
+    tentativas = 3
+    espera = 5
+    dados = None
+    for tentativa in range(1, tentativas + 1):
+        resp = requests.post(GOOGLE_APPS_SCRIPT_URL, json=payload, timeout=120)
+        try:
+            dados = resp.json()
+            break
+        except ValueError:
+            if tentativa < tentativas:
+                print(
+                    f"AVISO: resposta inesperada do Apps Script (status {resp.status_code}, "
+                    f"não é JSON — provavelmente uma falha transitória do Google, não um "
+                    f"problema real). Tentativa {tentativa}/{tentativas}, tentando de novo em "
+                    f"{espera}s..."
+                )
+                time.sleep(espera)
+                espera *= 2
+            else:
+                print(
+                    f"ERRO: resposta inesperada do Apps Script (status {resp.status_code}) "
+                    f"depois de {tentativas} tentativas:\n{resp.text[:2000]}\n"
+                    f"IMPORTANTE: isso não significa necessariamente que a planilha não foi "
+                    f"atualizada — esse erro específico já aconteceu com a escrita funcionando "
+                    f"normalmente nos bastidores. Confira a planilha antes de assumir que nada "
+                    f"foi gravado."
+                )
+                sys.exit(1)
 
     if dados.get("erro"):
         print(f"ERRO retornado pelo Apps Script: {dados['erro']}")
