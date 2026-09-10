@@ -160,7 +160,7 @@ DISTRIBUIDORAS = [
     {"nome_interno": "Cemar", "uf": "MA", "sig_agente": "EQUATORIAL MA"},  # confirmado pela aba SOP da planilha
     {"nome_interno": "Cemig-D", "uf": "MG", "sig_agente": "CEMIG-D"},
     {"nome_interno": "Cepisa", "uf": "PI", "sig_agente": "EQUATORIAL PI"},  # Equatorial comprou a Cepisa
-    {"nome_interno": "Ceron", "uf": "RO", "sig_agente": "ERO"},  # confirmado 27/08/2026 rodando ver_sigla_tarifas.py contra o CSV real
+    {"nome_interno": "Energisa Rondônia", "uf": "RO", "sig_agente": "ERO"},  # era "Ceron" — renomeada na planilha em 09/2026 (Energisa comprou/renomeou a Ceron); sig_agente ERO confirmado 27/08/2026 continua valendo, a ANEEL não mudou o nome na base dela
     {"nome_interno": "Coelba", "uf": "BA", "sig_agente": "COELBA"},
     {"nome_interno": "Copel-DIS", "uf": "PR", "sig_agente": "COPEL-DIS"},
     {"nome_interno": "Cosern", "uf": "RN", "sig_agente": "COSERN"},
