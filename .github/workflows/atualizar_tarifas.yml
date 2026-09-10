@@ -1,13 +1,21 @@
 name: Atualizar tarifas ANEEL no Google Sheets
 
 on:
-  # Sem agendamento automático de propósito: as tarifas homologadas não
-  # mudam todo dia, então a atualização é disparada sob demanda — pelo
-  # botão "⚡ SUNCLICK > 🔄 Atualizar Tarifas ANEEL" na própria planilha
-  # (que chama a API do GitHub por trás), ou manualmente por aqui na aba
-  # Actions. Se um dia fizer sentido voltar a ter um agendamento fixo, é só
-  # readicionar um bloco `schedule:` com um cron (ex.: "0 11 * * 1" pra
-  # toda segunda às 08h de Brasília).
+  # Roda sozinho a cada 3 dias (ver observação abaixo sobre o cron do
+  # GitHub Actions), e também pode ser disparado a qualquer momento pelo
+  # botão "⚡ SUNCLICK > 🔄 Atualizar Tarifas ANEEL" na própria planilha, ou
+  # manualmente por aqui na aba Actions.
+  schedule:
+    # O cron do GitHub Actions só entende campos de calendário (dia do
+    # mês, dia da semana), não "a cada 3 dias a partir da última vez que
+    # rodou" — não existe um jeito nativo de expressar isso. "*/3" no
+    # campo de dia do mês roda nos dias 1, 4, 7, 10, 13, 16, 19, 22, 25,
+    # 28, 31 (e o intervalo até o dia 1 do mês seguinte pode ficar maior
+    # ou menor que 3 dias, dependendo de quantos dias tem o mês) — é a
+    # aproximação mais próxima de "a cada 3 dias" sem depender de nada
+    # externo ao GitHub Actions. Horário: 08h de Brasília (UTC-3) = 11h
+    # UTC.
+    - cron: "0 11 */3 * *"
   workflow_dispatch: {}
 
 jobs:
