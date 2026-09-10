@@ -121,9 +121,19 @@ def extrair_distribuidora(dist, df_tarifas, df_componentes, hoje):
         "inicio_vigencia": linha.get("DatInicioVigencia", ""),
     }
 
+    # Notas de desambiguação (quando duas resoluções estavam vigentes ao
+    # mesmo tempo e a lib escolheu a mais recente sozinha) não podem ser
+    # descartadas silenciosamente — viram parte da observação final, pra
+    # ficar visível na planilha que uma escolha automática foi feita.
+    notas = []
+    if r_tusd_te.observacao:
+        notas.append(f"TUSD/TE: {r_tusd_te.observacao}")
+
     r_tusd_g = buscar_vigente(df_tarifas, sig, config.FILTRO_TUSD_G, hoje)
     if r_tusd_g.status == "OK":
         valores["tusd_g"] = r_tusd_g.linhas.iloc[0]["VlrTUSD_num"]
+        if r_tusd_g.observacao:
+            notas.append(f"TUSD-G: {r_tusd_g.observacao}")
     else:
         valores["tusd_g"] = None  # não encontrado não é erro fatal aqui, só fica em branco
 
@@ -136,11 +146,16 @@ def extrair_distribuidora(dist, df_tarifas, df_componentes, hoje):
         )
         if r.status == "OK":
             valores[campo] = r.linhas.iloc[0]["VlrComponenteTarifario_num"]
+            if r.observacao:
+                notas.append(f"{campo}: {r.observacao}")
         else:
             valores[campo] = None
             status_componentes.append(f"{campo}:{r.status}")
 
-    observacao = "; ".join(status_componentes) if status_componentes else ""
+    if status_componentes:
+        notas.append("; ".join(status_componentes))
+
+    observacao = " | ".join(notas)
     return {
         "nome_interno": nome,
         "status": "OK",
