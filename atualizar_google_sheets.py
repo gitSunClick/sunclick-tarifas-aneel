@@ -69,7 +69,13 @@ Uso:
 
 import os
 import sys
-from datetime import date
+from datetime import date, datetime
+
+try:
+    from zoneinfo import ZoneInfo
+    _FUSO_BRASILIA = ZoneInfo("America/Sao_Paulo")
+except Exception:  # pragma: no cover — fallback bem raro (tzdata ausente)
+    _FUSO_BRASILIA = None
 
 import config
 from aneel_lib import (
@@ -95,6 +101,14 @@ GOOGLE_APPS_SCRIPT_URL = os.environ.get("GOOGLE_APPS_SCRIPT_URL")
 GOOGLE_APPS_SCRIPT_TOKEN = os.environ.get("GOOGLE_APPS_SCRIPT_TOKEN")
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+
+
+def _agora_texto() -> str:
+    """Timestamp legível (dd/mm/aaaa hh:mm) no horário de Brasília — usado só
+    no caminho gspread; o caminho Apps Script (recomendado) calcula o
+    timestamp dentro do próprio Code.gs, no fuso da planilha."""
+    agora = datetime.now(_FUSO_BRASILIA) if _FUSO_BRASILIA else datetime.now()
+    return agora.strftime("%d/%m/%Y %H:%M")
 
 
 def extrair_distribuidora(dist, df_tarifas, df_componentes, hoje):
@@ -271,6 +285,10 @@ def escrever_via_apps_script(resultados):
         "worksheet": GOOGLE_WORKSHEET,
         "coluna_chave": config.COLUNA_CHAVE_PLANILHA,
         "coluna_status": config.COLUNAS_PLANILHA["status"],
+        # Opcional — só é enviada se configurada; Code.gs ignora se vazio.
+        # Quando presente, o Apps Script limpa e regrava essa coluna (e a
+        # de status) do zero a cada execução, com a data/hora da tentativa.
+        "coluna_timestamp": config.COLUNAS_PLANILHA.get("timestamp", ""),
         "linhas": _montar_linhas_apps_script(resultados),
     }
 
@@ -322,6 +340,32 @@ def escrever_via_gspread(resultados):
         aba.update_cell(1, nova_col_idx, col_status_nome)
         cabecalho.append(col_status_nome)
 
+    # idem para a coluna de timestamp (opcional)
+    col_timestamp_nome = config.COLUNAS_PLANILHA.get("timestamp")
+    if col_timestamp_nome and col_timestamp_nome not in cabecalho:
+        nova_col_idx = len(cabecalho) + 1
+        aba.update_cell(1, nova_col_idx, col_timestamp_nome)
+        cabecalho.append(col_timestamp_nome)
+
+    # Limpa status/timestamp de TODAS as linhas antes de regravar — mesma
+    # lógica do Code.gs: uma distribuidora que sumir do resultado desta
+    # rodada fica em branco em vez de manter um status antigo enganoso.
+    num_linhas_dados = max(len(chaves_planilha) - 1, 0)
+    if num_linhas_dados > 0:
+        col_status_idx = cabecalho.index(col_status_nome) + 1
+        aba.update(
+            f"{aba.cell(2, col_status_idx).address}:{aba.cell(1 + num_linhas_dados, col_status_idx).address}",
+            [[""] for _ in range(num_linhas_dados)],
+        )
+        if col_timestamp_nome:
+            col_timestamp_idx = cabecalho.index(col_timestamp_nome) + 1
+            aba.update(
+                f"{aba.cell(2, col_timestamp_idx).address}:{aba.cell(1 + num_linhas_dados, col_timestamp_idx).address}",
+                [[""] for _ in range(num_linhas_dados)],
+            )
+
+    agora = _agora_texto()
+
     naoencontradas = []
     atualizadas = 0
     for r in resultados:
@@ -334,10 +378,13 @@ def escrever_via_gspread(resultados):
             naoencontradas.append(r["nome_interno"])
             continue
 
-        # status sempre é atualizado
+        # status e timestamp sempre são atualizados (mesmo em pendência)
         col_status_idx = cabecalho.index(col_status_nome) + 1
         texto_status = r["status"] if r["status"] == "OK" else f"{r['status']}: {r['observacao']}"
         aba.update_cell(linha_idx, col_status_idx, texto_status)
+        if col_timestamp_nome:
+            col_timestamp_idx = cabecalho.index(col_timestamp_nome) + 1
+            aba.update_cell(linha_idx, col_timestamp_idx, agora)
 
         if r["status"] != "OK":
             # regra do handoff: nunca apagar valor existente numa pendência
